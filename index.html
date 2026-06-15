@@ -1,0 +1,218 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<script type="text/javascript" src="parts.js"></script>
+<script type="text/javascript">
+//【C-3.リプレイ＆ハイスコア機能をつけよう】
+
+//ゲームの開始の時にやること
+function start() {
+    for (let i = 0; i < 5; i++) { //【B-1:以下追加】各効果音についてくり返す
+        oto[i] = new Audio("oto" + i + ".mp3") //ファイルを開く
+        oto[i].preload = "auto" //音が自動で読み込まれるようにする
+        oto[i].load() //効果音を読み込んでおく
+    }
+    timerno = setInterval(mainloop, timer) //タイマーを起動する
+}
+
+//クリックされた時にやること
+function onclick_canvas(evt) {
+    mouse = mousezahyo(canvas, evt) //マウスの座標を得る
+    if (mode === 0) { //タイトルモードならば
+        if (onstart(mouse.x, mouse.y)) { //スタートボタン？
+            oto[0].currentTime = 0 //【B-1:追加】効果音の準備
+            oto[0].play() //【B-1:追加】効果音を流す
+            mode = 5 //通常プレイモードにする
+        }
+    } else if (mode === 9) { //【C-3:以下追加】タイムアップモードならば
+        if (onrestart(mouse.x, mouse.y)) { //リスタートボタン？
+            sounditachi(0) //効果音を流す
+            score = 0 //スコアをクリアする
+            hammers = 0 //ハンマーの状態を戻す(0:アップ)
+            itachis = [0, 0, 0, 0, 0, 0, 0, 0, 0] //いたちの状態を戻す(0:いない)
+            itachiwait = 20 //いたちの出現待ちカウンタを戻す
+            itachino = -1 //出現中のいたちの番号を戻す(-1:いない)
+            gametimer = gametimeri // ゲームタイマーを戻す
+            bonustime = gametimeri / 2 //ボーナスタイムを戻す(ゲームタイマー開始値の半分)
+            mode = 5 //通常プレイモードにする
+        }
+    }
+}
+
+//マウスが動いた時にやること
+function onmove_canvas(evt) {
+    if (mode >= 5 && mode < 9) { //【C-1:変更】各プレイモードならば
+        mouse = mousezahyo(canvas, evt) //マウスの座標を得る
+        hamsize = hammersize(mouse.y) //マウスのY座標を元にハンマーの大きさを決める
+        hammerx = mouse.x - hamsize / 2 //ハンマーのX座標はマウスのX座標－ハンマーの大きさ÷２
+        hammery = mouse.y - hamsize / 2 //ハンマーのY座標はマウスのY座標－ハンマーの大きさ÷２
+    }
+}
+
+//マウスボタンが押された時にやること
+function ondown_canvas(evt) {
+    if (mode >= 5 && mode < 9) { //【C-1:変更】各プレイモードならば
+        hammers = 1 //ハンマーをダウンにする
+        if (mode === 5 || mode === 6) { //【C-2:追加】通常プレイモードかゴールドいたちモードならば
+            if (itachis[itachino] === 1 && hammeritachi(itachino)) { //いたちがいてハンマーが当たっていたら
+                itachis[itachino] = 4 //当たりにする
+                score = score + getpoint(itachino, mode) //【C-1:変更】いたちの位置とモードで点数を得て加算
+                itachicount = itachicounti / 2 //いたち出現カウントの半分だけ時間をとる
+            }
+        } else { //【C-2:以下追加】３連モードならば
+            for (let i = sanren; i < 9; i = i + 3) { //いたちの0～2番から縦にくり返す
+                if (itachis[i] === 1 && hammeritachi(i)) { //いたちがいてハンマーが当たっていたら
+                    itachis[i] = 4 //当たりにする
+                    score = score + getpoint(i, mode) //いたちの位置とモードで点数を得て加算
+                    itachicount = itachicounti / 2 //いたち出現カウントの半分だけ時間をとる
+                }
+            }
+        }
+        if (score >= 20 && bonustime > 0) { //【A-1:以下追加】20点以上でボーナスタイムが有る？
+            oto[1].currentTime = 0 //【B-1:追加】効果音の準備(※A-1省略時は不要)
+            oto[1].play() //【B-1:追加】効果音を流す(※A-1省略時は不要)
+            gametimer = gametimer + bonustime //ボーナスタイムを追加
+            bonustime = 0 //ボーナスタイムを無しにする
+        }
+    }
+}
+
+//マウスボタンがはなされた時にやること
+function onup_canvas(evt) {
+    if (mode >= 5 && mode < 9) { //【C-1:変更】各プレイモードならば
+        hammers = 0 //ハンマーをアップにする
+    }
+}
+
+//一定時間おきにやること
+function mainloop() {
+    if (mode >= 5 && mode < 9) { //【C-1:変更】各プレイモードならば
+        gametimer = gametimer - 0.05 //ゲームタイマーをカウントダウン
+        if (gametimer <= 0.0) { //ゲームタイマーがゼロになったら
+            oto[2].currentTime = 0 //【B-1:追加】効果音の準備
+            oto[2].play() //【B-1:追加】効果音を流す
+            mode = 9 //タイムアップモードにする
+            hiscoreupdate(score) //【C-3:追加】ハイスコア更新
+            return //ループを抜ける
+        }
+        if (itachiwait > 0) { //いたちの出現待ち？
+            itachiwait-- //いたちの出現待ちカウントダウン
+        } else { //いたち出現OK？
+            if (itachicount <= 0) { //いたちがまだ出現していない？
+                if (score > 10 && Math.random() > 0.75) { //【C-1:以下追加】ゴールドいたち出現OK？
+                    sounditachi(3) //効果音を流す(※B-1省略時は不要)
+                    mode = 6 //ゴールドいたちモードにする
+                    itachicount = itachicounti / 2 //いたち出現カウントの半分をセット
+                    itachino = getitachino() //出現するいたちを決める
+                    itachis[itachino] = 1 //決まったいたちを出現させる
+                } else if (score > 10 && Math.random() > 0.8) { //【C-2:以下追加】３連いたち出現？
+                    sounditachi(4) //効果音を流す(※B-1省略時は不要)
+                    mode = 7 //３連いたちモードにする
+                    itachicount = itachicounti * 2 //いたち出現カウントを2倍にセット
+                    sanren = Math.floor(Math.random() * 3) //３連いたちの列(0～2)を決める
+                    for (let i = sanren; i < 9; i = i + 3) { //その列のいたちについてくり返す
+                        itachis[i] = 1 //決まったいたちを出現させる
+                    }
+                } else { //【C-1:追加】
+                    mode = 5 //【C-1:追加】通常プレイモードにする
+                    itachicount = itachicounti //いたち出現カウントセット
+                    itachino = getitachino() //出現するいたちを決める
+                    itachis[itachino] = 1 //決まったいたちを出現させる
+                } //【C-1:追加】
+            } else { //いたち出現中？
+                itachicount-- //いたち出現カウントをカウントダウン
+                if (itachicount <= 0) { //出現カウントがゼロ以下？
+                    if (mode === 5 || mode === 6) {  //【C-2:追加】通常プレイモードかゴールドいたちモードならば
+                        itachis[itachino] = 0 //出現中のいたちを消す
+                    } else { //【C-2:以下追加】３連モードならば
+                        for (let i = sanren; i < 9; i = i + 3) { //いたちの0～2番から縦にくり返す
+                            itachis[i] = 0 //出現中のいたちを消す
+                        }
+                    }
+                    itachiwait = getitachiwait() //いたち出現待ちカウントセット
+                }
+            }
+        }
+    }
+    draw() //画面をえがく処理を呼ぶ
+}
+
+//はいけい・タイマー・スコアをえがく
+function drawitem() {
+    ctx.drawImage(play, 0, 0) //プレイはいけいを表示
+    drawtimer(gametimer) //ゲームタイマーを表示
+    ctx.font = '36pt Arial' //文字サイズを指定
+    ctx.fillStyle = 'white' //白色に設定
+    ctx.fillText("SCORE:" + ("0000" + score).slice(-4), 168, 120) //スコアを4桁で表示
+    if (hiscore[0] > 0) { //【C-3:以下追加】ハイスコア[0]があれば
+        ctx.font = '24pt Arial' //文字サイズを指定
+        ctx.fillStyle = 'white' //白色に設定
+        ctx.fillText("HI-SCORE", 30, 392) //左下に「HI-SCORE」を表示
+        drawhiscore(1) //中下に「(1)」と1位のハイスコアを表示
+        if (hiscore[1] > 0) { //ハイスコア[1]があれば
+            drawhiscore(2) //中下に「(2)」と2位のハイスコアを表示
+            if (hiscore[2] > 0) { //ハイスコア[2]があれば
+                drawhiscore(3) //中下に「(3)」と3位のハイスコアを表示
+            }
+        }
+    }
+}
+
+//画面をえがく
+function draw() {
+    if (mode === 0) { //タイトルモードなら
+        ctx.drawImage(title, 0, 0) //タイトル画像を表示
+        for (let i = 3; i <= 8; i++) { //iを3から8までくり返す
+            if (i !== 7) { //7番をのぞいて
+                drawitachi(i) //いたち画像[i]番を表示
+            } else { //7番ならば
+                drawitachig(i) //ゴールドいたち画像[i]番を表示
+            }
+        }
+    } else if (mode >= 5 && mode < 9) { //【C-1:変更】各プレイモードならば
+        drawitem() //はいけい・タイマー・スコアをえがく
+        if (mode === 5 || mode === 6) { //【C-2:追加】通常プレイモードかゴールドいたちモードならば
+            if (itachis[itachino] > 0) { //いたち出現中？
+                if (mode === 5) { //【C-1:追加】通常プレイモードならば
+                    drawitachi(itachino) //出現中のいたちの画像を表示
+                } else { //【C-1:追加】
+                    drawitachig(itachino)  //【C-1:追加】出現中のゴールドいたちの画像を表示
+                } //【C-1:追加】
+                if (itachis[itachino] === 4) { //当たり？
+                    drawatari(itachino) //当たり画像を表示
+                }
+            }
+        } else { //【C-2:以下追加】３連いたちモードならば
+            for (let i = sanren; i < 9; i = i + 3) { //いたちの0～2番から縦にくり返す
+                if (itachis[i] > 0) { //いたち出現中？
+                    drawitachi(i) //出現中のいたちの画像を表示
+                }
+                if (itachis[i] === 4) { //当たり？
+                    drawatari(i) //当たり画像を表示
+                }
+            }
+        }
+        ctx.drawImage(hammer[hammers], hammerx, hammery, hamsize, hamsize) //ハンマーを表示
+    } else if (mode === 9) { //タイムアップモードならば
+        drawitem() //はいけい・タイマー・スコアをえがく
+        ctx.drawImage(timeup, 60, 180) //中央に「TIME UP」を表示
+        ctx.drawImage(restart, 450, 385) //【C-3:追加】リスタートボタンを表示
+    }
+}
+</script>
+
+</head>
+<body onload="init();"> <!-- 最初に１回だけやること（起動処理）を示す -->
+<canvas id="canvas" width="640" height="480" /></canvas> <!-- キャンバスの設置 -->
+<img id="title" src="title.png" style="display:none" /> <!-- タイトル画像おき場 -->
+<img id="play" src="play.png" style="display:none" /> <!-- プレイはいけい画像おき場 -->
+<img class="hammer" src="hammer0.gif" style="display:none" /> <!-- ハンマー画像[0]おき場 -->
+<img class="hammer" src="hammer1.gif" style="display:none" /> <!-- ハンマー画像[1]おき場 -->
+<img id="itachi" src="itachi.png" style="display:none" /> <!-- いたち画像おき場 -->
+<img id="itachig" src="itachig.png" style="display:none" /> <!-- ゴールドいたち画像おき場 -->
+<img id="atari" src="atari.gif" style="display:none" /> <!-- 当たり画像おき場 -->
+<img id="timeup" src="timeup.gif" style="display:none" /> <!-- タイムアップ画像おき場 -->
+<img id="restart" src="restart.gif" style="display:none" /> <!-- 【C-3:追加】リスタートボタン画像おき場 -->
+</body>
+</html>
